@@ -105,9 +105,7 @@ export const GetWeatherData = async(areaindex) => {
         default:
             area = '未知地區';
     }
-    const apiKey = 'CWB-427B7265-DE60-4C1F-8AD0-4E7509C741D1';
-    const target = 'F-C0032-001';
-    const url = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/${target}?Authorization=${apiKey}&format=JSON&locationName=${area}`;
+    const url = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/F-C0032-001?Authorization=CWB-427B7265-DE60-4C1F-8AD0-4E7509C741D1&format=JSON&locationName=${area}`;
     try {
         const response = await fetch(url);
         const data = await response.json();
