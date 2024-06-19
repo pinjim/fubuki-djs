@@ -474,7 +474,7 @@ export const SQpCalculation = (rarity, level, target, next, progress) => {
             }
             break;
         case 5:
-            maxlevel = [0, 50, 60, 70, 80, 90, 92, 94, 96, 98, 100, 102, 104, 106, 108, 110, 112, 114, 116, 118, 120]; //
+            maxlevel = [0, 50, 60, 70, 80, 90, 92, 94, 96, 98, 100, 102, 104, 106, 108, 110, 112, 114, 116, 118, 120];
             maxindex = maxlevel.findIndex(value => value >= target);
             minindex = maxlevel.findIndex(value => value >= level)-1;
             expnow = 0;
@@ -870,23 +870,22 @@ export const NQpCalculation = (rarity, level, target, next, progress) => {
     };
 }
 
-
+const ctxTime = new Date();
 export const action = async (ctx) => {
     try{
-        const ctxTime = new Date();
         const rarity= ctx.options.getInteger('rarity');
         const level = ctx.options.getInteger('level');
         const target = ctx.options.getInteger('target');
         const next = ctx.options.getInteger('next');
-        const upgrade = UpgradeCalculation(rarity, level, target);
-        const sqp = SQpCalculation(rarity, level, target, next, upgrade.progress);
-        const nqp = NQpCalculation(rarity, level, target, next, upgrade.progress);
-        if(level < 1) throw new Error(`輸入的目前等級下限`);
-        else if(level > 119) throw new Error(`輸入的目前等級大於119級`);
-        else if(target < level) throw new Error(`輸入的目標等級小於目前等級`);
-        else if(target < 2) throw new Error(`輸入的目標等級低於2等`);
-        else if(target > 120) throw new Error(`輸入的目標等級大於等級上限`);
+        if(level <= 0) throw new Error(`目前等級不能小於等級下限`);
+        else if(level >= 120) throw new Error(`目前等級不能大於119級`);
+        else if(target < level) throw new Error(`目標等級不能小於目前等級`);
+        else if(target <= 1) throw new Error(`目標等級不能低於2等`);
+        else if(target >= 121) throw new Error(`目標等級不能大於等級上限`);
         else{
+            const upgrade = UpgradeCalculation(rarity, level, target);
+            const sqp = SQpCalculation(rarity, level, target, next, upgrade.progress);
+            const nqp = NQpCalculation(rarity, level, target, next, upgrade.progress);
             await ctx.reply({
                 embeds: [
                     {
