@@ -881,45 +881,11 @@ export const action = async (ctx) => {
         const upgrade = UpgradeCalculation(rarity, level, target);
         const sqp = SQpCalculation(rarity, level, target, next, upgrade.progress);
         const nqp = NQpCalculation(rarity, level, target, next, upgrade.progress);
-        const sfeed = SFeedCalculation(level, target, next);
-        const nfeed = NFeedCalculation(level, target, next);
-        if(level < 1 || level > 119){
-            await ctx.reply({
-                embeds: [
-                    {
-                        type: 'rich',
-                        title: `目前等級必須介於1至119之間`,
-                        description: `請更正指令`,
-                        color: 0xFF0000,
-                        timestamp: ctxTime.toISOString(),
-                        footer: {
-                            text: 'powered by @pinjim0407'
-                        },
-                    }
-                ]
-            });
-            return;
-        }
-        else if(target < level|| target > 120 || target < 2){
-            let title;
-            if(target > 120 || target < 2) title = `目前等級必須介於2至120之間`;
-            else title = `目前等級必須小於目標等級`
-            await ctx.reply({
-                embeds: [
-                    {
-                        type: 'rich',
-                        title: title,
-                        description: `請更正指令`,
-                        color: 0xFF0000,
-                        timestamp: ctxTime.toISOString(),
-                        footer: {
-                            text: 'powered by @pinjim0407'
-                        },
-                    }
-                ]
-            });
-            return;
-        }
+        if(level < 1) throw new Error(`輸入的目前等級下限`);
+        else if(level > 119) throw new Error(`輸入的目前等級大於119級`);
+        else if(target < level) throw new Error(`輸入的目標等級小於目前等級`);
+        else if(target < 2) throw new Error(`輸入的目標等級低於2等`);
+        else if(target > 120) throw new Error(`輸入的目標等級大於等級上限`);
         else{
             await ctx.reply({
                 embeds: [
@@ -973,6 +939,19 @@ export const action = async (ctx) => {
             });
         }
     }catch(error){
-        await ctx.reply(`計算出現錯誤。\n錯誤代號 : ${error}`)
+        await ctx.reply({
+            embeds: [
+                {
+                    type: 'rich',
+                    title: `計算出現錯誤`,
+                    description: `${error}`,
+                    color: 0xFF0000,
+                    timestamp: ctxTime.toISOString(),
+                    footer: {
+                        text: 'powered by @pinjim0407'
+                    },
+                }
+            ]
+        });
     }
 }
