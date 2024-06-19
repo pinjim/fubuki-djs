@@ -48,7 +48,7 @@ client.once('ready', () => {
     });
     let channels = [];
     channels[0] = client.channels.cache.get('1242787299511500840');
-    channels[1] = client.channels.cache.get('1251476252393476119');
+    channels[1] = client.channels.cache.get('1251819210447913073');
     setInterval(async () => {
             try {
                 const response = await fetch(`https://opendata.cwa.gov.tw/api/v1/rest/datastore/E-A0015-001?Authorization=CWB-427B7265-DE60-4C1F-8AD0-4E7509C741D1&format=JSON`);
