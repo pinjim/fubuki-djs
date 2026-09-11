@@ -43,7 +43,7 @@ export const SaveEarthQuakeID = (id) => {
 }
 
 client.once('ready', () => { 
-    client.user.setPresence({
+    client.user.setPresence({                   
         status: 'idle',
     });
     let channels = [];
@@ -146,6 +146,8 @@ client.once('ready', () => {
                 else {
                         console.error(error);
                 }
+                const used = process.memoryUsage().heapUsed / 1024 / 1024;
+                console.log(`目前機器人記憶體用量：${Math.round(used * 100) / 100} MB`);
             }catch (error) {
                 console.error(error);
             }
