@@ -6,6 +6,7 @@
   "dependencies": {
     "discord.js": "^14.14.1",
     "dotenv": "^16.4.5",
+    "express": "^5.2.1",
     "fast-glob": "^3.3.2",
     "node-fetch": "^3.3.2",
     "pinia": "^2.1.7",

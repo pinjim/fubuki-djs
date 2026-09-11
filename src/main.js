@@ -5,9 +5,23 @@ import { loadCommands, loadEvents } from '@/core/loader'
 import { useAppStore } from '@/store/app'
 import fs from 'fs';
 import { MagnitudeLevel, DepthLevel, IntensityLevel } from './commands/earthquake'
+import express from 'express'
 
 vueInit()
 dotenv.config()
+
+//建立 Express 網頁伺服器（防 Render 休眠）
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+    res.send('OK');
+});
+
+app.listen(PORT, () => {
+    console.log(`Web 伺服器已成功監聽 Port: ${PORT}`);
+});
+
 loadCommands()
 const client = new Client({  
     intents: [
