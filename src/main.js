@@ -35,26 +35,38 @@ const appStore = useAppStore()
 appStore.client = client
 loadEvents()
 
-export const GetEarthQuakeID = () => {
-    let earthquakeID;
+const filePath = 'src/commands/variables.json';
+const readVariables = (type) => {
     try {
-        const data = fs.readFileSync('src/commands/earthquakeID.txt', 'utf-8');
-        earthquakeID = data.trim();
-        return earthquakeID;
+        if (!fs.existsSync(filePath)) return {};
+        const data = fs.readFileSync(filePath, 'utf-8');
+        return data.trim() ? JSON.parse(data)[type] || {} : {};
     } catch (error) {
-        console.error('讀取確認狀態時發生錯誤：', error);
+        console.error('讀取 JSON 檔案時發生錯誤：', error);
+        return {};
     }
+};
 
-}
-
-export const SaveEarthQuakeID = (id) => {
-    const idString = id.toString();
+const writeVariables = (type, key, value) => {
     try {
-        fs.writeFileSync('src/commands/earthquakeID.txt', idString, 'utf-8');
+        let jsonObject = {};
+        if (fs.existsSync(filePath)) {
+            const data = fs.readFileSync(filePath, 'utf-8');
+            if (data.trim()) jsonObject = JSON.parse(data);
+        }
+        
+        if (!jsonObject[type]) jsonObject[type] = {};
+        
+        // 使用動態鍵名 [key] 來寫入不同的欄位
+        jsonObject[type][key] = value; 
+        
+        fs.writeFileSync(filePath, JSON.stringify(jsonObject, null, 4), 'utf-8');
+        return true;
     } catch (error) {
-        console.error('寫入確認狀態時發生錯誤：', error);
+        console.error(`寫入欄位 ${key} 時發生錯誤：`, error);
+        return false;
     }
-}
+};
 
 client.once('ready', () => { 
     client.user.setPresence({                   
@@ -69,7 +81,7 @@ client.once('ready', () => {
                 const data = await response.json();
         
                 if (data.success === 'true') {
-                    let lastnumber = GetEarthQuakeID();
+                    let lastnumber = readVariables('IDs').earthquake_ID;
                     const earthquakeInfo = data.records.Earthquake;
                     const lastReportTime = new Date(earthquakeInfo[0].EarthquakeInfo.OriginTime);
                     const report = earthquakeInfo[0];
@@ -154,18 +166,93 @@ client.once('ready', () => {
                             ]});
                         }
                         lastnumber = number;
-                        SaveEarthQuakeID(lastnumber);
+                        writeVariables('IDs', 'earthquake_ID', lastnumber);
                     }
                 }
                 else {
                         console.error(error);
                 }
-                const used = process.memoryUsage().heapUsed / 1024 / 1024;
-                console.log(`目前機器人記憶體用量：${Math.round(used * 100) / 100} MB`);
             }catch (error) {
                 console.error(error);
             }
     }, 5000);
+    setInterval(async () => {
+        try {
+            // 1. 計算記憶體用量 (MB)
+            const used_temp = process.memoryUsage().heapUsed / 1024 / 1024;
+            const used = Math.round(used_temp * 100) / 100;
+
+            // 2. 獲取頻道
+            const status_channel = client.channels.cache.get('1550923188664406198');
+            if (!status_channel) return console.error('找不到指定的狀態頻道！');
+
+            // 3. 讀取與計算時間資訊
+            const starting_timestamp = readVariables('timestamps').starting_timestamp; // 預期為開機時的 Date.now() 或秒數
+            const now = Date.now();
+            
+            // 自動生成當前的狀態更新時間文字 (格式: 2026/09/20 02:12:00)
+            const latest_time_str = new Date(now).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+
+            // 自動計算精確的運行時間 (從開機到現在)
+            let uptime_str = "計算中...";
+            if (starting_timestamp) {
+                const diffMs = now - new Date(starting_timestamp).getTime();
+                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                uptime_str = `${diffDays}天 ${diffHours}時 ${diffMins}分`;
+            }
+
+            // 4. 更新 JSON 中的最新時間紀錄（非必要，但配合您原本的變數讀取）
+            writeVariables('timestamps', 'latest_timestamp', latest_time_str);
+
+            // 5. 建立嵌入訊息物件
+            const status_embed = [{
+                "title": "機器人運行狀態",
+                "description": `**記憶體用量**\n> ${used} MB\n\n**開機時間**\n> ${starting_timestamp || '未知'}\n\n**狀態更新時間**\n> ${latest_time_str}\n\n**運行時間**\n> ${uptime_str}`,
+                "color": 2326507,
+                "fields": [],
+                "author": {
+                    "icon_url": "https://media.discordapp.net/attachments/1251511632941547530/1550924562173272145/image.png?ex=6ab01a8e&is=6aaec90e&hm=79b690eefd2b22b85cd086d81061016cb280a67700a67385bcdd204cd826761c&=&format=webp&quality=lossless",
+                    "name": "白上フブキ",
+                    "url": "https://www.youtube.com/@ShirakamiFubuki"
+                },
+                "url": "https://fubuki-djs.onrender.com/",
+                "footer": {
+                    "text": "powered by @pinjim0407"
+                }
+            }];
+
+            // 6. 🔥 核心邏輯：檢查、修改或重新傳送
+            const targetMsgId = readVariables('IDs').bot_status_MSG_ID;
+            let isUpdated = false;
+
+            if (targetMsgId) {
+                try {
+                    // 嘗試從頻道中獲取該則訊息
+                    const existingMsg = await status_channel.messages.fetch(targetMsgId);
+                    // 成功找到，直接修改（Edit）
+                    await existingMsg.edit({ embeds: status_embed });
+                    isUpdated = true;
+                } catch (error) {
+                    // 錯誤碼 10008 代表訊息被手動刪除了
+                    if (error.code !== 10008) {
+                        console.error('獲取狀態訊息時發生非預期錯誤:', error);
+                    }
+                }
+            }
+
+            // 如果過去沒有紀錄 ID，或者舊訊息不見了（被刪除），就發送全新訊息
+            if (!isUpdated) {
+                const newMsg = await status_channel.send({ embeds: status_embed });
+                // 把新產生的訊息 ID 紀錄回 JSON 檔案中，下次就能用 edit 的
+                writeVariables('IDs', 'bot_status_MSG_ID', newMsg.id);
+            }
+
+        } catch (globalError) {
+            console.error('計時器執行狀態更新時發生嚴重錯誤:', globalError);
+        }
+    }, 30000);
 });
 
 client.on('messageCreate', message => {
