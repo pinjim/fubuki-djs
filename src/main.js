@@ -35,7 +35,6 @@ const appStore = useAppStore()
 appStore.client = client
 loadEvents()
 
-const starting_timestamp = new Date(now);
 const filePath = 'src/commands/variables.json';
 const readVariables = (type) => {
     try {
@@ -177,6 +176,8 @@ client.once('ready', () => {
                 console.error(error);
             }
     }, 5000);
+    const startTimeObj = new Date();
+    const starting_timestamp = startTimeObj.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
     setInterval(async () => {
         try {
             const used_temp = process.memoryUsage().heapUsed / 1024 / 1024;
@@ -307,6 +308,7 @@ client.once('ready', () => {
             );
         }
     }, 10000);
+
 });
 
 client.on('messageCreate', message => {
