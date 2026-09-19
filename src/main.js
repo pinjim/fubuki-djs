@@ -177,68 +177,136 @@ client.once('ready', () => {
                 console.error(error);
             }
     }, 5000);
-    // 1. 在主程式最外層（或事件外），宣告全域的開機時間常數
-// 這樣做每次重啟機器人都會自動精確刷新，完全不需要存進 variables.json！
-const startTimeObj = new Date();
-const starting_timestamp = startTimeObj.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
-
-// ... 您的其他 client.on('ready') 等程式碼 ...
-
     setInterval(async () => {
         try {
             const used_temp = process.memoryUsage().heapUsed / 1024 / 1024;
             const used = Math.round(used_temp * 100) / 100;
 
-            const status_channel = client.channels.cache.get('1550923188664406198');
-            if (!status_channel) return console.error('找不到指定的狀態頻道！');
+            const status_channel =
+                client.channels.cache.get('1550923188664406198');
+
+            if (!status_channel) {
+                return console.error('找不到指定的狀態頻道！');
+            }
 
             const now = Date.now();
-            const latest_time_str = new Date(now).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
-            
-            const diffMs = now - startTimeObj.getTime();
-            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-            const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-            const uptime_str = `${diffDays}天 ${diffHours}時 ${diffMins}分`;
 
-            writeVariables('timestamps', 'latest_timestamp', latest_time_str);
+            const latest_time_str = new Date(now).toLocaleString('zh-TW', {
+                timeZone: 'Asia/Taipei',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+
+            const diffMs = now - startTimeObj.getTime();
+
+            const diffDays = Math.floor(
+                diffMs / (1000 * 60 * 60 * 24)
+            );
+
+            const diffHours = Math.floor(
+                (diffMs % (1000 * 60 * 60 * 24)) /
+                (1000 * 60 * 60)
+            );
+
+            const diffMins = Math.floor(
+                (diffMs % (1000 * 60 * 60)) /
+                (1000 * 60)
+            );
+
+            const diffSecs = Math.floor(
+                (diffMs % (1000 * 60)) /
+                1000
+            );
+
+            const uptime_str =
+                `${diffDays}天 ${diffHours}時 ${diffMins}分 ${diffSecs}秒`;
+
+            writeVariables(
+                'timestamps',
+                'latest_timestamp',
+                latest_time_str
+            );
 
             const status_embed = [{
-                "title": "機器人運行狀態",
-                "description": `**記憶體用量**\n> ${used} MB\n\n**開機時間**\n> ${starting_timestamp}\n\n**狀態更新時間**\n> ${latest_time_str}\n\n**運行時間**\n> ${uptime_str}`,
-                "color": 2326507,
-                "fields": [],
-                "url": "https://onrender.com",
-                "footer": {
-                    "text": "powered by @pinjim0407"
+                title: '機器人運行狀態',
+
+                description:
+                    `**記憶體用量**\n` +
+                    `> ${used} MB\n\n` +
+
+                    `**開機時間**\n` +
+                    `> ${starting_timestamp}\n\n` +
+
+                    `**狀態更新時間**\n` +
+                    `> ${latest_time_str}\n\n` +
+
+                    `**運行時間**\n` +
+                    `> ${uptime_str}`,
+
+                color: 2326507,
+
+                fields: [],
+
+                url: 'https://onrender.com',
+
+                footer: {
+                    text: 'powered by @pinjim0407'
                 }
             }];
 
-            const targetMsgId = readVariables('IDs').bot_status_MSG_ID;
+            const targetMsgId =
+                readVariables('IDs').bot_status_MSG_ID;
             let isUpdated = false;
 
             if (targetMsgId) {
                 try {
-                    const existingMsg = await status_channel.messages.fetch(targetMsgId);
-                    await existingMsg.edit({ embeds: status_embed });
+                    const existingMsg =
+                        await status_channel.messages.fetch(targetMsgId);
+
+                    await existingMsg.edit({
+                        embeds: status_embed
+                    });
+
                     isUpdated = true;
+
                 } catch (error) {
+
                     if (error.code !== 10008) {
-                        console.error('獲取狀態訊息時發生非預期錯誤:', error);
+                        console.error(
+                            '獲取狀態訊息時發生非預期錯誤:',
+                            error
+                        );
                     }
                 }
             }
 
             if (!isUpdated) {
-                const newMsg = await status_channel.send({ embeds: status_embed });
-                writeVariables('IDs', 'bot_status_MSG_ID', newMsg.id);
+
+                const newMsg =
+                    await status_channel.send({
+                        embeds: status_embed
+                    });
+
+                writeVariables(
+                    'IDs',
+                    'bot_status_MSG_ID',
+                    newMsg.id
+                );
             }
 
         } catch (globalError) {
-            console.error('計時器執行狀態更新時發生嚴重錯誤:', globalError);
+
+            console.error(
+                '計時器執行狀態更新時發生嚴重錯誤:',
+                globalError
+            );
         }
     }, 10000);
-
 });
 
 client.on('messageCreate', message => {
