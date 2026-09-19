@@ -416,7 +416,7 @@ client.once('ready', () => {
 
                 fields: [],
 
-                url: 'https://onrender.com',
+                url: 'https://fubuki-djs.onrender.com/',
 
                 footer: {
                     text:
