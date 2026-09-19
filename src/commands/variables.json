@@ -1,10 +1,9 @@
 {
     "IDs" : {
         "earthquake_ID" : 115060,
-        "bot_status_MSG_ID" : 0
+        "bot_status_MSG_ID" : 1550934873613672522
     },
     "timestamps" : {
-        "starting_timestamp" : 0,
         "latest_timestamp" : 0
     }
 }
