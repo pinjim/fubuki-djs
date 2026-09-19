@@ -303,7 +303,7 @@ client.once('ready', () => {
 
     }, 5000);
 
-    const startTimeObj = new Date();
+    const startTimeObj = new Date()
 
     const starting_timestamp =
         startTimeObj.toLocaleString('zh-TW', {
@@ -315,28 +315,35 @@ client.once('ready', () => {
             minute: '2-digit',
             second: '2-digit',
             hour12: false
-        });
+        })
+
+    let statusUpdating = false
 
     setInterval(async () => {
+        if (statusUpdating) return
+
+        statusUpdating = true
+
         try {
             const used_temp =
-                process.memoryUsage().heapUsed / 1024 / 1024;
+                process.memoryUsage().heapUsed / 1024 / 1024
 
             const used =
-                Math.round(used_temp * 100) / 100;
+                Math.round(used_temp * 100) / 100
 
             const status_channel =
                 client.channels.cache.get(
                     '1550923188664406198'
-                );
+                )
 
             if (!status_channel) {
-                return console.error(
+                console.error(
                     '找不到指定的狀態頻道！'
-                );
+                )
+                return
             }
 
-            const now = Date.now();
+            const now = Date.now()
 
             const latest_time_str =
                 new Date(now).toLocaleString('zh-TW', {
@@ -348,46 +355,46 @@ client.once('ready', () => {
                     minute: '2-digit',
                     second: '2-digit',
                     hour12: false
-                });
+                })
 
             const diffMs =
-                now - startTimeObj.getTime();
+                now - startTimeObj.getTime()
 
             const diffDays =
                 Math.floor(
                     diffMs /
                     (1000 * 60 * 60 * 24)
-                );
+                )
 
             const diffHours =
                 Math.floor(
                     (diffMs %
                         (1000 * 60 * 60 * 24)) /
                     (1000 * 60 * 60)
-                );
+                )
 
             const diffMins =
                 Math.floor(
                     (diffMs %
                         (1000 * 60 * 60)) /
                     (1000 * 60)
-                );
+                )
 
             const diffSecs =
                 Math.floor(
                     (diffMs %
                         (1000 * 60)) /
                     1000
-                );
+                )
 
             const uptime_str =
-                `${diffDays}天 ${diffHours}時 ${diffMins}分 ${diffSecs}秒`;
+                `${diffDays}天 ${diffHours}時 ${diffMins}分 ${diffSecs}秒`
 
             writeVariables(
                 'timestamps',
                 'latest_timestamp',
                 latest_time_str
-            );
+            )
 
             const status_embed = [{
                 title: '機器人運行狀態',
@@ -415,77 +422,64 @@ client.once('ready', () => {
                     text:
                         'powered by @pinjim0407'
                 }
-            }];
+            }]
 
-            if (!statusMessage) {
+            const targetMsgId =
+                readVariables('IDs').bot_status_MSG_ID
+
+            let updated = false
+
+            if (targetMsgId) {
                 try {
-                    const targetMsgId =
-                        readVariables('IDs').bot_status_MSG_ID;
+                    const fetched =
+                        await status_channel.messages.fetch(
+                            targetMsgId
+                        )
 
-                    if (targetMsgId) {
-                        try {
-                            statusMessage =
-                                await status_channel.messages.fetch(
-                                    targetMsgId
-                                );
-                        } catch (error) {
-                            if (error.code !== 10008) {
-                                console.error(
-                                    '獲取狀態訊息時發生非預期錯誤:',
-                                    error
-                                );
-                            }
-                        }
-                    }
+                    if (
+                        fetched &&
+                        typeof fetched.edit === 'function'
+                    ) {
+                        await fetched.edit({
+                            embeds: status_embed
+                        })
 
-                    if (!statusMessage) {
-                        statusMessage =
-                            await status_channel.send({
-                                embeds: status_embed
-                            });
-
-                        writeVariables(
-                            'IDs',
-                            'bot_status_MSG_ID',
-                            statusMessage.id
-                        );
+                        updated = true
                     }
 
                 } catch (error) {
-                    console.error(
-                        '建立狀態訊息時發生錯誤:',
-                        error
-                    );
-                }
-
-            } else {
-                try {
-                    await statusMessage.edit({
-                        embeds: status_embed
-                    });
-
-                } catch (error) {
-                    if (error.code === 10008) {
-                        statusMessage = null;
-                    } else {
+                    if (error.code !== 10008) {
                         console.error(
-                            '更新狀態訊息時發生錯誤:',
+                            '更新既有狀態訊息時發生錯誤:',
                             error
-                        );
-
-                        statusMessage = null;
+                        )
                     }
                 }
             }
 
-        } catch (globalError) {
+            if (!updated) {
+                const newMsg =
+                    await status_channel.send({
+                        embeds: status_embed
+                    })
+
+                writeVariables(
+                    'IDs',
+                    'bot_status_MSG_ID',
+                    newMsg.id
+                )
+            }
+
+        } catch (error) {
             console.error(
-                '計時器執行狀態更新時發生嚴重錯誤:',
-                globalError
-            );
+                '更新狀態訊息時發生錯誤:',
+                error
+            )
+        } finally {
+            statusUpdating = false
         }
 
-    }, 10000);
+    }, 10000)
 
 });
 
