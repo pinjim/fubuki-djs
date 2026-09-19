@@ -10,7 +10,6 @@ import express from 'express'
 vueInit()
 dotenv.config()
 
-//建立 Express 網頁伺服器（防 Render 休眠）
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -23,6 +22,7 @@ app.listen(PORT, () => {
 });
 
 loadCommands()
+
 const client = new Client({  
     intents: [
         GatewayIntentBits.Guilds, 
@@ -36,6 +36,7 @@ appStore.client = client
 loadEvents()
 
 const filePath = 'src/commands/variables.json';
+
 const readVariables = (type) => {
     try {
         if (!fs.existsSync(filePath)) return {};
@@ -50,17 +51,22 @@ const readVariables = (type) => {
 const writeVariables = (type, key, value) => {
     try {
         let jsonObject = {};
+
         if (fs.existsSync(filePath)) {
             const data = fs.readFileSync(filePath, 'utf-8');
             if (data.trim()) jsonObject = JSON.parse(data);
         }
-        
+
         if (!jsonObject[type]) jsonObject[type] = {};
-        
-        // 使用動態鍵名 [key] 來寫入不同的欄位
-        jsonObject[type][key] = value; 
-        
-        fs.writeFileSync(filePath, JSON.stringify(jsonObject, null, 4), 'utf-8');
+
+        jsonObject[type][key] = value;
+
+        fs.writeFileSync(
+            filePath,
+            JSON.stringify(jsonObject, null, 4),
+            'utf-8'
+        );
+
         return true;
     } catch (error) {
         console.error(`寫入欄位 ${key} 時發生錯誤：`, error);
@@ -68,161 +74,311 @@ const writeVariables = (type, key, value) => {
     }
 };
 
+let statusMessage = null;
+
 client.once('ready', () => { 
     client.user.setPresence({                   
         status: 'idle',
     });
+
     let channels = [];
     channels[0] = client.channels.cache.get('1242787299511500840');
     channels[1] = client.channels.cache.get('1251476252393476119');
+
+    let lastEarthquakeID = readVariables('IDs').earthquake_ID;
+    let earthquakeChecking = false;
+
     setInterval(async () => {
-            try {
-                const response = await fetch(`https://opendata.cwa.gov.tw/api/v1/rest/datastore/E-A0015-001?Authorization=CWB-427B7265-DE60-4C1F-8AD0-4E7509C741D1&format=JSON`);
-                const data = await response.json();
-        
-                if (data.success === 'true') {
-                    let lastnumber = readVariables('IDs').earthquake_ID;
-                    const earthquakeInfo = data.records.Earthquake;
-                    const lastReportTime = new Date(earthquakeInfo[0].EarthquakeInfo.OriginTime);
-                    const report = earthquakeInfo[0];
-                    const magnitude = report.EarthquakeInfo.EarthquakeMagnitude.MagnitudeValue;
-                    const number = report.EarthquakeNo;
-                    const depth = report.EarthquakeInfo.FocalDepth;
-                    const location = report.EarthquakeInfo.Epicenter.Location;
-                    const reportContent = report.ReportContent;
-                    const reportUrl = report.Web;
-                    const imageUrl = report.ReportImageURI;
-                    if(number != lastnumber){
-                        const areatable = [];
-                        let index = 0;
-                        let values = [];
-                        values[0] = MagnitudeLevel(magnitude);
-                        values[1] = DepthLevel(depth);
-                        console.log(`value : ${values[1]}`);
-                        let field = [
-                            {
+        if (earthquakeChecking) return;
+
+        earthquakeChecking = true;
+
+        try {
+            const response = await fetch(
+                `https://opendata.cwa.gov.tw/api/v1/rest/datastore/E-A0015-001?Authorization=CWB-427B7265-DE60-4C1F-8AD0-4E7509C741D1&format=JSON`
+            );
+
+            const data = await response.json();
+
+            if (data.success === 'true') {
+                const report = data.records.Earthquake[0];
+
+                const lastReportTime =
+                    new Date(report.EarthquakeInfo.OriginTime);
+
+                const magnitude =
+                    report.EarthquakeInfo.EarthquakeMagnitude.MagnitudeValue;
+
+                const number =
+                    report.EarthquakeNo;
+
+                const depth =
+                    report.EarthquakeInfo.FocalDepth;
+
+                const location =
+                    report.EarthquakeInfo.Epicenter.Location;
+
+                const reportContent =
+                    report.ReportContent;
+
+                const reportUrl =
+                    report.Web;
+
+                const imageUrl =
+                    report.ReportImageURI;
+
+                if (number != lastEarthquakeID) {
+                    const areatable = [];
+                    let index = 0;
+                    const values = [];
+
+                    values[0] = MagnitudeLevel(magnitude);
+                    values[1] = DepthLevel(depth);
+
+                    console.log(
+                        `value : ${JSON.stringify(values[1])}`
+                    );
+
+                    const field = [
+                        {
                             name: `地點`,
                             value: `${location}`,
                             inline: false
-                            },
-                            {
+                        },
+                        {
                             name: `地震規模 ${values[0].image}`,
-                            value: `> 芮氏${magnitude}\n> ${values[0].level}`,
+                            value:
+                                `> 芮氏${magnitude}\n> ${values[0].level}`,
                             inline: true
-                            },
-                            {
+                        },
+                        {
                             name: `地震深度 ${values[1].image}`,
-                            value: `> ${depth}公里\n> ${values[1].level}`,
+                            value:
+                                `> ${depth}公里\n> ${values[1].level}`,
                             inline: true
-                            },
-                        ];
-                        for(let i=0; i<20; i++){
-                            try{
-                                let area = data.records.Earthquake[0].Intensity.ShakingArea[i].AreaDesc;
-                                console.log(`result${i+1} : ${area}`);
-                                if(area.includes('最大震度')) {
-                                    areatable[index] = report.Intensity.ShakingArea[i];
-                                    index += 1;
-                            }
-                            }catch(error){
-                                console.log(`result${i+1} : ${error}`);
-                            }
                         }
+                    ];
+
+                    const shakingAreas =
+                        report.Intensity?.ShakingArea || [];
+
+                    for (
+                        let i = 0;
+                        i < shakingAreas.length;
+                        i++
+                    ) {
+                        const area =
+                            shakingAreas[i].AreaDesc;
+
+                        console.log(
+                            `result${i + 1} : ${area}`
+                        );
+
+                        if (area.includes('最大震度')) {
+                            areatable[index] =
+                                shakingAreas[i];
+
+                            index += 1;
+                        }
+                    }
+
+                    if (index > 0) {
                         areatable.sort((a, b) => {
-                            const intensityA = parseFloat(a.AreaIntensity.match(/\d+/)[0]);
-                            const intensityB = parseFloat(b.AreaIntensity.match(/\d+/)[0]);
+                            const intensityA =
+                                parseFloat(
+                                    a.AreaIntensity.match(/\d+/)[0]
+                                );
+
+                            const intensityB =
+                                parseFloat(
+                                    b.AreaIntensity.match(/\d+/)[0]
+                                );
+
                             return intensityA - intensityB;
                         });
-                        values[2] = IntensityLevel(areatable[index-1].AreaIntensity);
+
+                        values[2] =
+                            IntensityLevel(
+                                areatable[index - 1].AreaIntensity
+                            );
+
                         console.log(areatable);
-                        let newfield = {name: `最大震度 ${values[2].image}`,value: `> ${areatable[index-1].AreaIntensity}\n> ${values[2].level}`,inline: true};
-                        field.push(newfield);
-                        for(let i=index-1; i>=0; i--){
-                            newfield = { name: `${areatable[i].AreaDesc}`, value: `${areatable[i].CountyName}`, inline: false};
-                            field.push(newfield);
+
+                        field.push({
+                            name:
+                                `最大震度 ${values[2].image}`,
+
+                            value:
+                                `> ${areatable[index - 1].AreaIntensity}\n` +
+                                `> ${values[2].level}`,
+
+                            inline: true
+                        });
+
+                        for (
+                            let i = index - 1;
+                            i >= 0;
+                            i--
+                        ) {
+                            field.push({
+                                name:
+                                    `${areatable[i].AreaDesc}`,
+
+                                value:
+                                    `${areatable[i].CountyName}`,
+
+                                inline: false
+                            });
                         }
-                        for(let i=0; i<channels.length; i++){
+
+                        lastEarthquakeID = number;
+
+                        writeVariables(
+                            'IDs',
+                            'earthquake_ID',
+                            lastEarthquakeID
+                        );
+
+                        for (
+                            let i = 0;
+                            i < channels.length;
+                            i++
+                        ) {
+                            if (!channels[i]) continue;
+
                             await channels[i].send({
                                 embeds: [
-                                {   
-                                author: {
-                                    name: '中央氣象局',
-                                    iconURL: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/ROC_Central_Weather_Bureau.svg/1200px-ROC_Central_Weather_Bureau.svg.png'
-                                },
-                                type: 'rich',
-                                title: `**地震報告 #${number}**`,
-                                url: reportUrl,
-                                description: `${reportContent}`,
-                                fields: field,
-                                color: values[2].color,
-                                image: { 
-                                    url: imageUrl
-                                },
-                                footer: {
-                                    text: `powered by @pinjim0407`
-                                },
-                                timestamp: lastReportTime,
-                                },
-                            ]});
+                                    {
+                                        author: {
+                                            name: '中央氣象局',
+                                            iconURL:
+                                                'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/ROC_Central_Weather_Bureau.svg/1200px-ROC_Central_Weather_Bureau.svg.png'
+                                        },
+
+                                        type: 'rich',
+
+                                        title:
+                                            `**地震報告 #${number}**`,
+
+                                        url:
+                                            reportUrl,
+
+                                        description:
+                                            `${reportContent}`,
+
+                                        fields:
+                                            field,
+
+                                        color:
+                                            values[2].color,
+
+                                        image: {
+                                            url:
+                                                imageUrl
+                                        },
+
+                                        footer: {
+                                            text:
+                                                `powered by @pinjim0407`
+                                        },
+
+                                        timestamp:
+                                            lastReportTime
+                                    }
+                                ]
+                            });
                         }
-                        lastnumber = number;
-                        writeVariables('IDs', 'earthquake_ID', lastnumber);
                     }
                 }
-                else {
-                        console.error(error);
-                }
-            }catch (error) {
-                console.error(error);
+            } else {
+                console.error(data);
             }
+
+        } catch (error) {
+            console.error(error);
+
+        } finally {
+            earthquakeChecking = false;
+        }
+
     }, 5000);
+
     const startTimeObj = new Date();
-    const starting_timestamp = startTimeObj.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+
+    const starting_timestamp =
+        startTimeObj.toLocaleString('zh-TW', {
+            timeZone: 'Asia/Taipei',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+
     setInterval(async () => {
         try {
-            const used_temp = process.memoryUsage().heapUsed / 1024 / 1024;
-            const used = Math.round(used_temp * 100) / 100;
+            const used_temp =
+                process.memoryUsage().heapUsed / 1024 / 1024;
+
+            const used =
+                Math.round(used_temp * 100) / 100;
 
             const status_channel =
-                client.channels.cache.get('1550923188664406198');
+                client.channels.cache.get(
+                    '1550923188664406198'
+                );
 
             if (!status_channel) {
-                return console.error('找不到指定的狀態頻道！');
+                return console.error(
+                    '找不到指定的狀態頻道！'
+                );
             }
 
             const now = Date.now();
 
-            const latest_time_str = new Date(now).toLocaleString('zh-TW', {
-                timeZone: 'Asia/Taipei',
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-            });
+            const latest_time_str =
+                new Date(now).toLocaleString('zh-TW', {
+                    timeZone: 'Asia/Taipei',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
 
-            const diffMs = now - startTimeObj.getTime();
+            const diffMs =
+                now - startTimeObj.getTime();
 
-            const diffDays = Math.floor(
-                diffMs / (1000 * 60 * 60 * 24)
-            );
+            const diffDays =
+                Math.floor(
+                    diffMs /
+                    (1000 * 60 * 60 * 24)
+                );
 
-            const diffHours = Math.floor(
-                (diffMs % (1000 * 60 * 60 * 24)) /
-                (1000 * 60 * 60)
-            );
+            const diffHours =
+                Math.floor(
+                    (diffMs %
+                        (1000 * 60 * 60 * 24)) /
+                    (1000 * 60 * 60)
+                );
 
-            const diffMins = Math.floor(
-                (diffMs % (1000 * 60 * 60)) /
-                (1000 * 60)
-            );
+            const diffMins =
+                Math.floor(
+                    (diffMs %
+                        (1000 * 60 * 60)) /
+                    (1000 * 60)
+                );
 
-            const diffSecs = Math.floor(
-                (diffMs % (1000 * 60)) /
-                1000
-            );
+            const diffSecs =
+                Math.floor(
+                    (diffMs %
+                        (1000 * 60)) /
+                    1000
+                );
 
             const uptime_str =
                 `${diffDays}天 ${diffHours}時 ${diffMins}分 ${diffSecs}秒`;
@@ -256,73 +412,112 @@ client.once('ready', () => {
                 url: 'https://onrender.com',
 
                 footer: {
-                    text: 'powered by @pinjim0407'
+                    text:
+                        'powered by @pinjim0407'
                 }
             }];
 
-            const targetMsgId =
-                readVariables('IDs').bot_status_MSG_ID;
-            let isUpdated = false;
-
-            if (targetMsgId) {
+            if (!statusMessage) {
                 try {
-                    const existingMsg =
-                        await status_channel.messages.fetch(targetMsgId);
+                    const targetMsgId =
+                        readVariables('IDs').bot_status_MSG_ID;
 
-                    await existingMsg.edit({
+                    if (targetMsgId) {
+                        try {
+                            statusMessage =
+                                await status_channel.messages.fetch(
+                                    targetMsgId
+                                );
+                        } catch (error) {
+                            if (error.code !== 10008) {
+                                console.error(
+                                    '獲取狀態訊息時發生非預期錯誤:',
+                                    error
+                                );
+                            }
+                        }
+                    }
+
+                    if (!statusMessage) {
+                        statusMessage =
+                            await status_channel.send({
+                                embeds: status_embed
+                            });
+
+                        writeVariables(
+                            'IDs',
+                            'bot_status_MSG_ID',
+                            statusMessage.id
+                        );
+                    }
+
+                } catch (error) {
+                    console.error(
+                        '建立狀態訊息時發生錯誤:',
+                        error
+                    );
+                }
+
+            } else {
+                try {
+                    await statusMessage.edit({
                         embeds: status_embed
                     });
 
-                    isUpdated = true;
-
                 } catch (error) {
-
-                    if (error.code !== 10008) {
+                    if (error.code === 10008) {
+                        statusMessage = null;
+                    } else {
                         console.error(
-                            '獲取狀態訊息時發生非預期錯誤:',
+                            '更新狀態訊息時發生錯誤:',
                             error
                         );
+
+                        statusMessage = null;
                     }
                 }
             }
 
-            if (!isUpdated) {
-
-                const newMsg =
-                    await status_channel.send({
-                        embeds: status_embed
-                    });
-
-                writeVariables(
-                    'IDs',
-                    'bot_status_MSG_ID',
-                    newMsg.id
-                );
-            }
-
         } catch (globalError) {
-
             console.error(
                 '計時器執行狀態更新時發生嚴重錯誤:',
                 globalError
             );
         }
+
     }, 10000);
 
 });
 
 client.on('messageCreate', message => {
     if(message.author.bot) return;
+
     const prefix = '!';
-    if(message.content.includes(prefix+`repeat`)){
+
+    if(message.content.includes(prefix + `repeat`)){
         message.delete();
-        message.channel.send(`${message.content.substring(8)}`);
+        message.channel.send(
+            `${message.content.substring(8)}`
+        );
     }
-    if(message.content.includes(`fbk你說呢`)||message.content.includes(`FBK你說呢`)||message.content.includes(`fbk怎麼說`)||message.content.includes(`FBK怎麼說`)){
+
+    if(
+        message.content.includes(`fbk你說呢`) ||
+        message.content.includes(`FBK你說呢`) ||
+        message.content.includes(`fbk怎麼說`) ||
+        message.content.includes(`FBK怎麼說`)
+    ){
         let gif;
-        const result = Math.floor(Math.random()*2);
-        if(result === 0) gif = `https://tenor.com/bVogn.gif`;
-        else if(result === 1) gif = `https://tenor.com/bzWZZ.gif`;
+
+        const result =
+            Math.floor(Math.random() * 2);
+
+        if(result === 0)
+            gif = `https://tenor.com/bVogn.gif`;
+
+        else if(result === 1)
+            gif = `https://tenor.com/bzWZZ.gif`;
+
         message.reply(gif);
     }
 });
